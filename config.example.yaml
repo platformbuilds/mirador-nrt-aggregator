@@ -1,0 +1,242 @@
+# mirador-nrt-aggregator — example configuration
+# ===============================================================
+
+# ------------------------------- Receivers -------------------------------
+receivers:
+  # OTLP gRPC (spec-compliant: traces/metrics/logs, gzip; TLS/mTLS)
+  otlpgrpc:
+    endpoint: ":4317"
+    extra:
+      reflection: true
+      max_recv_msg_bytes: 16777216
+      max_send_msg_bytes: 16777216
+      # tls:
+      #   enabled: true
+      #   cert_file: /etc/mirador/tls/server.crt
+      #   key_file: /etc/mirador/tls/server.key
+      #   client_ca_file: /etc/mirador/tls/ca.crt
+      #   require_client_cert: true
+      # keepalive:
+      #   time_ms: 120000
+      #   timeout_ms: 20000
+      #   permit_without_stream: true
+
+  # OTLP HTTP (spec-compliant: /v1/{traces,metrics,logs}, gzip; TLS/mTLS)
+  otlphttp:
+    endpoint: ":4318"
+    extra:
+      max_body_bytes: 16777216
+      read_timeout_ms: 30000
+      write_timeout_ms: 30000
+      idle_timeout_ms: 120000
+      # paths:
+      #   traces: /v1/traces
+      #   metrics: /v1/metrics
+      #   logs: /v1/logs
+      # tls:
+      #   enabled: true
+      #   cert_file: /etc/mirador/tls/server.crt
+      #   key_file: /etc/mirador/tls/server.key
+      #   client_ca_file: /etc/mirador/tls/ca.crt
+      #   require_client_cert: true
+
+  # Prometheus Remote Write (snappy/gzip)
+  promrw:
+    endpoint: ":19291"
+    extra:
+      path: /api/v1/write
+      max_body_bytes: 33554432
+      read_timeout_ms: 30000
+      write_timeout_ms: 30000
+      idle_timeout_ms: 120000
+      # tls:
+      #   enabled: true
+      #   cert_file: /etc/mirador/tls/server.crt
+      #   key_file: /etc/mirador/tls/server.key
+      #   client_ca_file: /etc/mirador/tls/ca.crt
+      #   require_client_cert: true
+
+  # JSON logs over HTTP (NDJSON or single JSON)
+  jsonlogs/http:
+    endpoint: "0.0.0.0:19292"
+    extra:
+      path: /v1/logs
+
+  # Kafka receivers (set kind per topic)
+  kafka/traces:
+    brokers: ["kafka-1:9092","kafka-2:9092"]
+    topic: otlp-traces
+    group: mirador-traces
+    kind: traces
+    extra:
+      max_bytes: 10485760
+
+  kafka/metrics:
+    brokers: ["kafka-1:9092","kafka-2:9092"]
+    topic: otlp-metrics
+    group: mirador-metrics
+    kind: metrics
+
+  kafka/promrw:
+    brokers: ["kafka-1:9092"]
+    topic: prom-remote-write
+    group: mirador-promrw
+    kind: prom_rw
+
+  kafka/jsonlogs:
+    brokers: ["kafka-1:9092"]
+    topic: business-logs
+    group: mirador-logs
+    kind: json_logs
+    extra:
+      ndjson: true         # split each message by newline into multiple events
+
+  # Pulsar receivers (parity with Kafka)
+  pulsar/traces:
+    endpoint: "pulsar://pulsar:6650"   # or brokers: ["pulsar://pulsar:6650"]
+    topic: "persistent://public/default/otlp-traces"
+    group: "mirador-traces"            # subscription name
+    kind: traces
+    extra:
+      subscription_type: shared
+      receiver_queue_size: 1000
+      message_chan_buffer: 64
+      # auth_token_file: /var/run/secrets/pulsar/token
+      # tls_trust_certs_file: /etc/ssl/certs/ca-bundle.crt
+      # tls_allow_insecure: false
+
+  pulsar/jsonlogs:
+    endpoint: "pulsar://pulsar:6650"
+    topic: "persistent://public/default/logs"
+    group: "mirador-logs"
+    kind: json_logs
+    extra:
+      ndjson: true
+      subscription_type: shared
+
+# ------------------------------ Processors -------------------------------
+processors:
+  # Conditional filters (configurable expressions)
+  filter/metrics-pre:
+    stage: pre
+    on: metrics
+    drop_non_matching: true
+    expr: 'attrs["env"] == "prod"'
+
+  filter/agg-post:
+    stage: post
+    on: aggregates
+    drop_non_matching: true
+    expr: 'anomaly_score >= 0.8 || error_rate > 0.05'
+
+  # Span → Metrics (RED) + errors_total from status/events
+  spanmetrics:
+    dimensions: ["service.name","http.method","http.route","span.kind","status.code"]
+    histogram_buckets: [0.005,0.01,0.025,0.05,0.1,0.25,0.5,1,2.5,5,10]
+    error_from_status: true
+    error_from_events: true
+    error_event_names: ["exception"]
+    error_event_attr_dims: ["exception.type"]
+    max_error_attr_values: 1000
+
+  # OTLP Logs → JSON flattener (so logsum sees uniform JSON)
+  otlplogs:
+    resource_attrs: true
+    scope_attrs: true
+    attr_prefix: ""
+    resource_prefix: "resource."
+    scope_prefix: "scope."
+    level_alias: "level"
+    service_key: "service.name"
+
+  # JSON logs → rolling aggregates
+  logsum:
+    window_seconds: 60
+    service_field: "service"
+    level_field: "level"
+    error_levels: ["error","fatal"]
+    user_id_fields: ["user_id","account_id"]
+    topk_fields: ["endpoint","operation"]
+    topk_limit: 5
+    quantile_field: "latency_ms"
+    reservoir_cap: 256
+
+  # Summarizer (tumbling windows + t-digest; OTLP & PromRW)
+  summarizer:
+    window_seconds: 60
+    service_attribute: "service.name"   # used when available in resource/labels
+    bucket_sample_cap: 50               # samples per histogram bucket (cost cap)
+
+  # Isolation Forest anomaly scorer
+  iforest:
+    features: ["p99","error_rate","rps"]
+    threshold: 0.7
+    normalization: "zscore"
+    baseline_window: 3600
+    subsample_size: 256
+    model_path: "/etc/mirador/models/iforest.json"
+
+  # Vectorizer (logs/traces text; metrics numeric with optional PCA)
+  vectorizer:
+    mode: "ollama"                      # "ollama" | "hash"
+    endpoint: "http://ollama:11434"
+    model: "nomic-embed-text"           # or "all-minilm"
+    allow_fallback: true
+    timeout_ms: 5000
+    retries: 2
+    hash_dim: 384
+    hash_ngrams: 2
+    lowercase: true
+    stopwords: ["the","a","an","and","or","to","of","in","on","for","with"]
+    logs:
+      include_fields: ["org_id","success","error_code"]
+    metrics:
+      p90_approx: true
+      ema_alpha: 0.3
+      pca:
+        enabled: false
+        # matrix_path: "/etc/mirador/models/pca_metrics.json"
+    traces:
+      include_span_attrs: ["http.method","http.route","status.code","span.kind","db.system"]
+      max_attrs: 6
+
+# ------------------------------- Exporters -------------------------------
+exporters:
+  weaviate:
+    endpoint: "http://weaviate:8080"
+    class: "MiradorAggregate"
+    api_key: "${WEAVIATE_API_KEY}"
+
+# ------------------------------- Service --------------------------------
+service:
+  pipelines:
+    # Traces → spanmetrics → summarizer → iforest → vectorizer → Weaviate
+    traces:
+      receivers: [otlpgrpc, otlphttp, kafka/traces, pulsar/traces]
+      processors: [spanmetrics, filter/metrics-pre, summarizer, filter/agg-post, iforest, vectorizer]
+      exporters: [weaviate]
+
+    # Metrics (OTLP + PromRW) → summarizer → iforest → vectorizer → Weaviate
+    metrics:
+      receivers: [otlpgrpc, otlphttp, promrw, kafka/metrics, kafka/promrw]
+      processors: [filter/metrics-pre, summarizer, filter/agg-post, iforest, vectorizer]
+      exporters: [weaviate]
+
+    # Logs (OTLP logs + JSON logs) → flatten → logsum → iforest → vectorizer → Weaviate
+    logs:
+      receivers: [otlpgrpc, otlphttp, jsonlogs/http, kafka/jsonlogs, pulsar/jsonlogs]
+      processors: [otlplogs, logsum, filter/agg-post, iforest, vectorizer]
+      exporters: [weaviate]
+
+# ----------------------------- Extensions --------------------------------
+extensions:
+  health_check:
+    endpoint: "0.0.0.0:13133"
+  pprof:
+    endpoint: "0.0.0.0:1777"
+  zpages:
+    endpoint: "0.0.0.0:55679"
+
+# ------------------------ Self-monitoring metrics -------------------------
+prometheus:
+  endpoint: "0.0.0.0:8888"   # exposes /metrics for drops, anomalies, etc.

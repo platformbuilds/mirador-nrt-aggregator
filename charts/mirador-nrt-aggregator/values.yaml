@@ -1,0 +1,176 @@
+# Deployment mode: Deployment | DaemonSet | StatefulSet
+mode: Deployment
+
+image:
+  repository: yourorg/mirador-nrt-aggregator
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+replicaCount: 2
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+rbac:
+  create: true
+
+podAnnotations: {}
+podLabels: {}
+
+priorityClassName: ""
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+# Ports surfaced by the service (align to OTLP specs & our receivers)
+service:
+  type: ClusterIP
+  annotations: {}
+  ports:
+    otlp-grpc: 4317
+    otlp-http: 4318
+    promrw: 19291
+    jsonlogs: 19292
+    metrics: 8888
+    health: 13133
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts: []
+  tls: []
+
+# Config gets rendered into a ConfigMap; you can paste your full pipeline here.
+# Default is a safe, functional config matching our earlier example.
+config: |
+  {{- /* You may replace this block with your own config */ -}}
+  {{- nindent 2 .Values.defaultConfig | trim | nindent 0 -}}
+
+# Reference default config (separate to keep values.yaml tidy)
+defaultConfig: |
+  {{- /* full config.example.yaml from earlier answer, trimmed for space */ -}}
+  receivers:
+    otlpgrpc:
+      endpoint: ":4317"
+      extra:
+        reflection: true
+    otlphttp:
+      endpoint: ":4318"
+    promrw:
+      endpoint: ":19291"
+      extra:
+        path: /api/v1/write
+    jsonlogs/http:
+      endpoint: "0.0.0.0:19292"
+
+  processors:
+    spanmetrics: {}
+    otlplogs: {}
+    logsum:
+      window_seconds: 60
+    summarizer:
+      window_seconds: 60
+    iforest:
+      features: ["p99","error_rate","rps"]
+      threshold: 0.7
+    vectorizer:
+      mode: "hash"
+
+  exporters:
+    weaviate:
+      endpoint: "http://weaviate:8080"
+      class: "MiradorAggregate"
+      api_key: "${WEAVIATE_API_KEY}"
+
+  service:
+    pipelines:
+      traces:
+        receivers: [otlpgrpc, otlphttp]
+        processors: [spanmetrics, summarizer, iforest, vectorizer]
+        exporters: [weaviate]
+      metrics:
+        receivers: [otlpgrpc, otlphttp, promrw]
+        processors: [summarizer, iforest, vectorizer]
+        exporters: [weaviate]
+      logs:
+        receivers: [otlpgrpc, otlphttp, jsonlogs/http]
+        processors: [otlplogs, logsum, iforest, vectorizer]
+        exporters: [weaviate]
+
+  prometheus:
+    endpoint: "0.0.0.0:8888"
+
+extraEnv: []
+# - name: SOME_FLAG
+#   value: "true"
+
+# Create a secret for Weaviate API key and mount as env
+weaviate:
+  apiKeySecret:
+    create: true
+    name: mirador-weaviate
+    key: api-key
+    value: ""   # set via --set-file or external Secret; leave empty to avoid committing secrets
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 13133
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /healthz
+    port: 13133
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+serviceMonitor:
+  enabled: true
+  interval: 15s
+  scrapeTimeout: 10s
+  labels: {}
+
+podMonitor:
+  enabled: false
+  interval: 15s
+  scrapeTimeout: 10s
+  labels: {}
+
+hpa:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+pdb:
+  enabled: true
+  minAvailable: 1

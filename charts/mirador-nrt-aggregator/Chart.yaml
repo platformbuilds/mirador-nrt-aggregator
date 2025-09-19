@@ -1,0 +1,19 @@
+apiVersion: v2
+name: mirador-nrt-aggregator
+description: Near real-time telemetry summarizer + anomaly scoring + vectorizer exporting to Weaviate
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://example.com/mirador-nrt-aggregator
+maintainers:
+  - name: Mirador Team
+sources:
+  - https://github.com/yourorg/mirador-nrt-aggregator
+keywords:
+  - opentelemetry
+  - observability
+  - weaviate
+  - traces
+  - metrics
+  - logs
+kubeVersion: ">=1.22.0-0"

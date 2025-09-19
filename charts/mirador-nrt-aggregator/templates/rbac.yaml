@@ -1,0 +1,28 @@
+{{- if .Values.rbac.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "mirador.fullname" . }}
+  labels:
+    {{- include "mirador.labels" . | nindent 4 }}
+rules:
+  # minimal: read pods/nodes if you ever enable k8s attrs; adjust as needed
+  - apiGroups: [""]
+    resources: ["pods", "nodes"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "mirador.fullname" . }}
+  labels:
+    {{- include "mirador.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "mirador.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ default (include "mirador.fullname" .) .Values.serviceAccount.name }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}
