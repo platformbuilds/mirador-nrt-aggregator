@@ -21,7 +21,7 @@ import (
 
 // Receiver implements the OTLP/HTTP spec endpoints:
 //
-//	POST /v1/traces   (ExportTracesServiceRequest)
+//	POST /v1/traces   (ExportTraceServiceRequest)
 //	POST /v1/metrics  (ExportMetricsServiceRequest)
 //	POST /v1/logs     (ExportLogsServiceRequest)
 //

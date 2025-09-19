@@ -28,14 +28,16 @@ type ReceiverCfg struct {
 }
 
 type ProcessorCfg struct {
-	Name          string         `yaml:"-"`
-	Type          string         `yaml:"type"`
-	WindowSeconds int            `yaml:"window_seconds,omitempty"`
-	Quantiles     []float64      `yaml:"quantiles,omitempty"`
-	Features      []string       `yaml:"features,omitempty"`
-	NTrees        int            `yaml:"n_trees,omitempty"`
-	Threshold     float64        `yaml:"threshold,omitempty"`
-	Extra         map[string]any `yaml:",inline"`
+	Name             string         `yaml:"-"`
+	Type             string         `yaml:"type"`
+	WindowSeconds    int            `yaml:"window_seconds,omitempty"`
+	HistogramBuckets []float64      `yaml:"histogram_buckets,omitempty"`
+	Dimensions       []string       `yaml:"dimensions,omitempty"`
+	Quantiles        []float64      `yaml:"quantiles,omitempty"`
+	Features         []string       `yaml:"features,omitempty"`
+	NTrees           int            `yaml:"n_trees,omitempty"`
+	Threshold        float64        `yaml:"threshold,omitempty"`
+	Extra            map[string]any `yaml:",inline"`
 }
 
 type ExporterCfg struct {

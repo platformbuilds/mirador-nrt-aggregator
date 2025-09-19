@@ -10,6 +10,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -253,8 +254,8 @@ func (p *processor) buildLogsText(a model.Aggregate) string {
 	parts := []string{
 		"kind=log",
 		"service=" + a.Service,
-		"ts_start=" + strconv(a.WindowStart),
-		"ts_end=" + strconv(a.WindowEnd),
+		"ts_start=" + formatInt64(a.WindowStart),
+		"ts_end=" + formatInt64(a.WindowEnd),
 	}
 
 	// success default: success if error_rate ~ 0
@@ -297,7 +298,7 @@ func (p *processor) buildMetricsVector(a model.Aggregate) []float32 {
 	// base: [p50, p90, p95, p99, rps, error_rate, error_count, count_norm]
 	p90 := a.P95
 	if p.p90Approx {
-		p90 = 0.5*(a.P50+a.P95)
+		p90 = 0.5 * (a.P50 + a.P95)
 	}
 	errCount := a.ErrorRate * float64(a.Count)
 	countNorm := float64(a.Count) / (1.0 + float64(a.WindowEnd-a.WindowStart))
@@ -367,8 +368,8 @@ func (p *processor) buildTracesText(a model.Aggregate) string {
 	parts := []string{
 		"kind=trace",
 		"service=" + a.Service,
-		"ts_start=" + strconv(a.WindowStart),
-		"ts_end=" + strconv(a.WindowEnd),
+		"ts_start=" + formatInt64(a.WindowStart),
+		"ts_end=" + formatInt64(a.WindowEnd),
 		"p50=" + f6(a.P50),
 		"p95=" + f6(a.P95),
 		"p99=" + f6(a.P99),
@@ -555,47 +556,10 @@ func normalize(v []float32) {
 }
 
 func f6(x float64) string {
-	return strconv(x) //  reuse compact integer/float formatter
+	return strconv.FormatFloat(x, 'f', 6, 64)
 }
 
-func strconv(x interface{}) string {
-	switch t := x.(type) {
-	case int64:
-		return strconvI64(t)
-	case int:
-		return strconvI64(int64(t))
-	case float64:
-		return strconvF64(t)
-	default:
-		return ""
-	}
-}
-
-func strconvI64(v int64) string { return strconvFormatInt(v, 10) }
-func strconvF64(v float64) string {
-	// compact float
-	return strconvFormatFloat(v, 'f', 6, 64)
-}
-
-// Minimal local wrappers to keep the import section tidy:
-func strconvFormatInt(i int64, base int) string { return strconvFmtInt(i, base) }
-func strconvFormatFloat(f float64, fmt byte, prec, bitSize int) string {
-	return strconvFmtFloat(f, fmt, prec, bitSize)
-}
-
-func strconvFmtInt(i int64, base int) string {
-	return strconv.Itoa(int(i)) // acceptable for our ranges; if you prefer exact, import strconv.FormatInt
-}
-
-func strconvFmtFloat(f float64, fmt byte, prec, bitSize int) string {
-	// For simplicity, import strconv here for accurate formatting:
-	return strconv.FormatFloat(f, fmt, prec, bitSize)
-}
-
-// --- bring in strconv cleanly ---
-import (
-	"strconv"
-)
+func formatInt64(v int64) string { return strconv.FormatInt(v, 10) }
 
 // ---------------------- PCA loading ----------------------
 
@@ -656,8 +620,14 @@ func pcaFromFile(pf pcaFile) (*pcaModel, error) {
 // ---------------------- nested config helpers ----------------------
 
 func nestedStringSlice(extra map[string]any, k1, k2 string) ([]string, bool) {
-	n1, ok := extra[k1].(map[string]any); if !ok { return nil, false }
-	raw, ok := n1[k2].([]any); if !ok { return nil, false }
+	n1, ok := extra[k1].(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	raw, ok := n1[k2].([]any)
+	if !ok {
+		return nil, false
+	}
 	out := make([]string, 0, len(raw))
 	for _, it := range raw {
 		if s, ok := it.(string); ok && s != "" {
@@ -667,34 +637,63 @@ func nestedStringSlice(extra map[string]any, k1, k2 string) ([]string, bool) {
 	return out, true
 }
 func nestedBool(extra map[string]any, k1, k2 string) (bool, bool) {
-	n1, ok := extra[k1].(map[string]any); if !ok { return false, false }
-	b, ok := n1[k2].(bool); return b, ok
+	n1, ok := extra[k1].(map[string]any)
+	if !ok {
+		return false, false
+	}
+	b, ok := n1[k2].(bool)
+	return b, ok
 }
 func nestedBoolDefault(extra map[string]any, def bool, k1, k2, k3 string) bool {
-	n1, ok := extra[k1].(map[string]any); if !ok { return def }
-	n2, ok := n1[k2].(map[string]any); if !ok { return def }
-	b, ok := n2[k3].(bool); if !ok { return def }
+	n1, ok := extra[k1].(map[string]any)
+	if !ok {
+		return def
+	}
+	n2, ok := n1[k2].(map[string]any)
+	if !ok {
+		return def
+	}
+	b, ok := n2[k3].(bool)
+	if !ok {
+		return def
+	}
 	return b
 }
 func nestedNumber(extra map[string]any, k1, k2 string) (float64, bool) {
-	n1, ok := extra[k1].(map[string]any); if !ok { return 0, false }
+	n1, ok := extra[k1].(map[string]any)
+	if !ok {
+		return 0, false
+	}
 	switch t := n1[k2].(type) {
-	case float64: return t, true
-	case int: return float64(t), true
-	case int64: return float64(t), true
+	case float64:
+		return t, true
+	case int:
+		return float64(t), true
+	case int64:
+		return float64(t), true
 	case string:
-		if f, err := strconv.ParseFloat(t, 64); err == nil { return f, true }
+		if f, err := strconv.ParseFloat(t, 64); err == nil {
+			return f, true
+		}
 	}
 	return 0, false
 }
 func nestedInt(extra map[string]any, k1, k2 string) (int, bool) {
-	n1, ok := extra[k1].(map[string]any); if !ok { return 0, false }
+	n1, ok := extra[k1].(map[string]any)
+	if !ok {
+		return 0, false
+	}
 	switch t := n1[k2].(type) {
-	case int: return t, true
-	case int64: return int(t), true
-	case float64: return int(t), true
+	case int:
+		return t, true
+	case int64:
+		return int(t), true
+	case float64:
+		return int(t), true
 	case string:
-		if i, err := strconv.Atoi(t); err == nil { return i, true }
+		if i, err := strconv.Atoi(t); err == nil {
+			return i, true
+		}
 	}
 	return 0, false
 }
@@ -709,10 +708,15 @@ func (p *processor) defaultSummary(a model.Aggregate) string {
 	sb.WriteString(time.Unix(a.WindowStart, 0).UTC().Format(time.RFC3339))
 	sb.WriteString("-")
 	sb.WriteString(time.Unix(a.WindowEnd, 0).UTC().Format(time.RFC3339))
-	sb.WriteString(" p50="); sb.WriteString(f6(a.P50))
-	sb.WriteString(" p95="); sb.WriteString(f6(a.P95))
-	sb.WriteString(" p99="); sb.WriteString(f6(a.P99))
-	sb.WriteString(" rps="); sb.WriteString(f6(a.RPS))
-	sb.WriteString(" err_rate="); sb.WriteString(f6(a.ErrorRate))
+	sb.WriteString(" p50=")
+	sb.WriteString(f6(a.P50))
+	sb.WriteString(" p95=")
+	sb.WriteString(f6(a.P95))
+	sb.WriteString(" p99=")
+	sb.WriteString(f6(a.P99))
+	sb.WriteString(" rps=")
+	sb.WriteString(f6(a.RPS))
+	sb.WriteString(" err_rate=")
+	sb.WriteString(f6(a.ErrorRate))
 	return sb.String()
 }

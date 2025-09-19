@@ -7,7 +7,7 @@ type Envelope struct {
 	// Kind identifies the payload type.
 	// Supported values:
 	//   "metrics"   - OTLP ExportMetricsServiceRequest (protobuf bytes)
-	//   "traces"    - OTLP ExportTracesServiceRequest (protobuf bytes)
+	//   "traces"    - OTLP ExportTraceServiceRequest (protobuf bytes)
 	//   "prom_rw"   - Prometheus Remote Write (prompb.WriteRequest protobuf bytes)
 	//   "json_logs" - One JSON log event (raw JSON bytes)
 	Kind string `json:"kind"`

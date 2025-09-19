@@ -18,7 +18,7 @@ import (
 // Receiver consumes binary payloads from Kafka and forwards them as model.Envelope.
 // Supported kinds:
 //   - "metrics":   OTLP ExportMetricsServiceRequest
-//   - "traces":    OTLP ExportTracesServiceRequest
+//   - "traces":    OTLP ExportTraceServiceRequest
 //   - "prom_rw":   Prometheus Remote Write (prompb.WriteRequest)
 //   - "json_logs": JSON payload per message (or NDJSON if extra.ndjson = true)
 type Receiver struct {

@@ -29,8 +29,8 @@ import (
 // It forwards the *decompressed* protobuf bytes of prompb.WriteRequest as
 // model.Envelope{Kind: model.KindPromRW, Bytes: <raw protobuf>}.
 type Receiver struct {
-	endpoint       string // host:port, e.g. ":19291"
-	path           string // default "/api/v1/write"
+	endpoint string // host:port, e.g. ":19291"
+	path     string // default "/api/v1/write"
 
 	// Limits / timeouts
 	maxBodyBytes int64
@@ -167,7 +167,7 @@ func (r *Receiver) Start(ctx context.Context, out chan<- model.Envelope) error {
 		// Non-blocking forward (drop on backpressure, but still 200 OK)
 		env := model.Envelope{
 			Kind:   model.KindPromRW,
-			Bytes:  decompressed,      // raw prompb.WriteRequest
+			Bytes:  decompressed, // raw prompb.WriteRequest
 			Attrs:  extractPromHeaders(req),
 			TSUnix: time.Now().Unix(),
 		}
@@ -242,7 +242,7 @@ func (r *Receiver) buildTLS() (*tls.Config, error) {
 		MinVersion:   tls.VersionTLS12,
 		Certificates: []tls.Certificate{cert},
 	}
-	if r.tlsClientCAFile != "", {
+	if r.tlsClientCAFile != "" {
 		pem, err := os.ReadFile(r.tlsClientCAFile)
 		if err != nil {
 			return nil, err
@@ -321,6 +321,8 @@ func nestedBool(m map[string]any, k1, k2 string) (bool, bool) {
 }
 
 func min(a, b int) int {
-	if a < b { return a }
+	if a < b {
+		return a
+	}
 	return b
 }

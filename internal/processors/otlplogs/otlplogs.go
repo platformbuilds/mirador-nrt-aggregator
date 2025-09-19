@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,28 +15,28 @@ import (
 	colllog "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	com "go.opentelemetry.io/proto/otlp/common/v1"
 	res "go.opentelemetry.io/proto/otlp/resource/v1"
-	logs "go.opentelemetry.io/proto/otlp/logs/v1"
 	"google.golang.org/protobuf/proto"
 )
 
 // processor flattens OTLP LogRecords into JSON events that downstream (logsum, filter, vectorizer) already support.
 //
 // Config (processors.otlplogs):
-//   extra.resource_attrs: true         # include resource attributes  (default: true)
-//   extra.scope_attrs:     true         # include scope/instrumentation attrs (name/version) (default: true)
-//   extra.attr_prefix:     ""           # optional prefix for attributes keys (e.g., "attr.")
-//   extra.resource_prefix: "resource."  # optional prefix for resource attributes (default: "resource.")
-//   extra.scope_prefix:    "scope."     # prefix for scope fields (default: "scope.")
-//   extra.level_alias:     "level"      # add duplicate field (severityText) under this key (default: "level")
-//   extra.service_key:     "service.name" # which resource attr to copy as top-level service key (default "service.name")
+//
+//	extra.resource_attrs: true         # include resource attributes  (default: true)
+//	extra.scope_attrs:     true         # include scope/instrumentation attrs (name/version) (default: true)
+//	extra.attr_prefix:     ""           # optional prefix for attributes keys (e.g., "attr.")
+//	extra.resource_prefix: "resource."  # optional prefix for resource attributes (default: "resource.")
+//	extra.scope_prefix:    "scope."     # prefix for scope fields (default: "scope.")
+//	extra.level_alias:     "level"      # add duplicate field (severityText) under this key (default: "level")
+//	extra.service_key:     "service.name" # which resource attr to copy as top-level service key (default "service.name")
 type processor struct {
-	includeRes    bool
-	includeScope  bool
-	attrPrefix    string
-	resPrefix     string
-	scopePrefix   string
-	levelAlias    string
-	serviceKey    string
+	includeRes   bool
+	includeScope bool
+	attrPrefix   string
+	resPrefix    string
+	scopePrefix  string
+	levelAlias   string
+	serviceKey   string
 }
 
 func New(cfg config.ProcessorCfg) *processor {
@@ -290,18 +291,11 @@ func hexLower(b []byte) string {
 
 func trimFloat(f float64) string {
 	// compact float printing (no trailing zeros)
-	s := strconvFormatFloat(f, 'f', 6, 64)
+	s := strconv.FormatFloat(f, 'f', 6, 64)
 	s = strings.TrimRight(s, "0")
 	s = strings.TrimRight(s, ".")
 	if s == "" {
 		return "0"
 	}
 	return s
-}
-
-// small local wrapper (import strconv explicitly to keep header tidy)
-import "strconv"
-
-func strconvFormatFloat(f float64, fmt byte, prec, bitSize int) string {
-	return strconv.FormatFloat(f, fmt, prec, bitSize)
 }

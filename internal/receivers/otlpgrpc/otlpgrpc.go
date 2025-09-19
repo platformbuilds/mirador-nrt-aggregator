@@ -287,11 +287,11 @@ type tracesSvc struct {
 	out chan<- model.Envelope
 }
 
-func (s *tracesSvc) Export(ctx context.Context, req *colltr.ExportTracesServiceRequest) (*colltr.ExportTracesServiceResponse, error) {
+func (s *tracesSvc) Export(ctx context.Context, req *colltr.ExportTraceServiceRequest) (*colltr.ExportTraceServiceResponse, error) {
 	b, err := proto.Marshal(req)
 	if err != nil {
 		log.Printf("[otlpgrpc/traces] marshal error: %v", err)
-		return &colltr.ExportTracesServiceResponse{}, nil
+		return &colltr.ExportTraceServiceResponse{}, nil
 	}
 	select {
 	case s.out <- model.Envelope{
@@ -302,7 +302,7 @@ func (s *tracesSvc) Export(ctx context.Context, req *colltr.ExportTracesServiceR
 	}:
 	case <-ctx.Done():
 	}
-	return &colltr.ExportTracesServiceResponse{}, nil
+	return &colltr.ExportTraceServiceResponse{}, nil
 }
 
 type logsSvc struct {

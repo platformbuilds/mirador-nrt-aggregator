@@ -11,6 +11,7 @@ import (
 	"github.com/platformbuilds/mirador-nrt-aggregator/internal/model"
 
 	collmet "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
+	colltr "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	com "go.opentelemetry.io/proto/otlp/common/v1"
 	met "go.opentelemetry.io/proto/otlp/metrics/v1"
 	res "go.opentelemetry.io/proto/otlp/resource/v1"
@@ -110,7 +111,7 @@ func (p *processor) Start(ctx context.Context, in <-chan any, out chan<- any) er
 }
 
 func (p *processor) tracesToResourceMetrics(raw []byte) []*met.ResourceMetrics {
-	var et tr.ExportTracesServiceRequest
+	var et colltr.ExportTraceServiceRequest
 	if err := proto.Unmarshal(raw, &et); err != nil {
 		log.Printf("[spanmetrics] cannot unmarshal traces: %v", err)
 		return nil

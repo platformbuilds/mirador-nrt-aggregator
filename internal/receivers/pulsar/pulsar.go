@@ -18,7 +18,7 @@ import (
 // Receiver consumes messages from Apache Pulsar and forwards them as model.Envelope.
 // Supported kinds:
 //   - "metrics":   OTLP ExportMetricsServiceRequest
-//   - "traces":    OTLP ExportTracesServiceRequest
+//   - "traces":    OTLP ExportTraceServiceRequest
 //   - "prom_rw":   Prometheus Remote Write (prompb.WriteRequest)
 //   - "json_logs": JSON payload per message (or NDJSON if extra.ndjson = true)
 //
@@ -138,7 +138,7 @@ func (r *Receiver) Start(ctx context.Context, out chan<- model.Envelope) error {
 
 	cliOpts := ps.ClientOptions{
 		URL:                        r.serviceURL,
-		AllowTLSInsecureConnection: r.tlsAllowInsecure,
+		TLSAllowInsecureConnection: r.tlsAllowInsecure,
 		TLSTrustCertsFilePath:      r.tlsTrustCertsPath,
 	}
 

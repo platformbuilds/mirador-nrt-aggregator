@@ -11,6 +11,7 @@ import (
 	"github.com/platformbuilds/mirador-nrt-aggregator/internal/config"
 	"github.com/platformbuilds/mirador-nrt-aggregator/internal/model"
 
+	gogoproto "github.com/golang/protobuf/proto"
 	prompb "github.com/prometheus/prometheus/prompb"
 	"google.golang.org/protobuf/proto"
 
@@ -223,6 +224,9 @@ func (p *processor) consumeSum(name string, res map[string]string, s *met.Sum, s
 func (p *processor) consumeHistogram(name string, res map[string]string, h *met.Histogram, st *svc) {
 	isDelta := h.GetAggregationTemporality() == met.AggregationTemporality_AGGREGATION_TEMPORALITY_DELTA
 	for _, dp := range h.GetDataPoints() {
+		if st.td == nil {
+			return
+		}
 		bounds := dp.GetExplicitBounds()
 		counts := make([]float64, len(dp.GetBucketCounts()))
 		if isDelta {
@@ -244,7 +248,10 @@ func (p *processor) consumeHistogram(name string, res map[string]string, h *met.
 			}
 			ub := bounds[i]
 			for j := 0; j < reps; j++ {
-				st.td.Add(ub, 1)
+				if err := st.td.AddWeighted(ub, 1); err != nil {
+					log.Printf("[summarizer] tdigest add error: %v", err)
+					break
+				}
 			}
 			st.count += uint64(reps)
 		}
@@ -255,7 +262,7 @@ func (p *processor) consumeHistogram(name string, res map[string]string, h *met.
 
 func (p *processor) consumePromRW(raw []byte, winStart int64) {
 	var wr prompb.WriteRequest
-	if err := proto.Unmarshal(raw, &wr); err != nil {
+	if err := gogoproto.Unmarshal(raw, &wr); err != nil {
 		log.Printf("[summarizer] failed to unmarshal PromRW: %v", err)
 		return
 	}
@@ -264,6 +271,9 @@ func (p *processor) consumePromRW(raw []byte, winStart int64) {
 		name := lbls["__name__"]
 		svcName := firstNonEmpty(lbls[p.svcAttr], lbls["service.name"], lbls["service"], lbls["job"], "unknown")
 		st := p.ensureSvc(svcName)
+		if st.td == nil {
+			continue
+		}
 
 		switch {
 		case strings.HasSuffix(name, "_duration_seconds_bucket"):
@@ -279,7 +289,10 @@ func (p *processor) consumePromRW(raw []byte, winStart int64) {
 			for _, s := range ts.Samples {
 				reps := int(minf(s.Value, float64(p.bucketSampleCap)))
 				for j := 0; j < reps; j++ {
-					st.td.Add(ub, 1)
+					if err := st.td.AddWeighted(ub, 1); err != nil {
+						log.Printf("[summarizer] tdigest add error: %v", err)
+						break
+					}
 				}
 				st.count += uint64(maxf(s.Value, 0))
 			}
@@ -314,8 +327,21 @@ func (p *processor) ensureSvc(name string) *svc {
 	if s, ok := p.state[name]; ok {
 		return s
 	}
+	td, err := tdigest.New()
+	if err != nil {
+		log.Printf("[summarizer] tdigest init error: %v", err)
+		if fallback, ferr := tdigest.New(tdigest.Compression(100)); ferr == nil {
+			td = fallback
+		} else {
+			log.Printf("[summarizer] tdigest fallback init error: %v", ferr)
+			return &svc{td: nil, labels: map[string]string{}}
+		}
+	}
+	if td == nil {
+		return &svc{td: nil, labels: map[string]string{}}
+	}
 	ns := &svc{
-		td:     tdigest.New(),
+		td:     td,
 		labels: map[string]string{},
 	}
 	p.state[name] = ns
