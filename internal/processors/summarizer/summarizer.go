@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/caio/go-tdigest"
-	"github.com/yourorg/mirador-nrt-aggregator/internal/config"
-	"github.com/yourorg/mirador-nrt-aggregator/internal/model"
+	"github.com/caio/go-tdigest/v4"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/config"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/model"
 
 	prompb "github.com/prometheus/prometheus/prompb"
 	"google.golang.org/protobuf/proto"

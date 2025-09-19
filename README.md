@@ -55,7 +55,7 @@ This repo provides a Helm chart similar to [opentelemetry-collector](https://git
 
 ### Install
 ```bash
-helm repo add mirador https://yourorg.github.io/mirador-nrt-aggregator
+helm repo add mirador https://github.com/platformbuilds/mirador-nrt-aggregator
 helm upgrade --install mirador mirador/mirador-nrt-aggregator \
   --set image.repository=yourorg/mirador-nrt-aggregator \
   --set image.tag=0.1.0 \

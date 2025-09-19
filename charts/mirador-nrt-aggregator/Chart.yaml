@@ -8,7 +8,7 @@ home: https://example.com/mirador-nrt-aggregator
 maintainers:
   - name: Mirador Team
 sources:
-  - https://github.com/yourorg/mirador-nrt-aggregator
+  - https://github.com/platformbuilds/mirador-nrt-aggregator
 keywords:
   - opentelemetry
   - observability

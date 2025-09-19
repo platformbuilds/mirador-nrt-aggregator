@@ -11,8 +11,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/yourorg/mirador-nrt-aggregator/internal/config"
-	"github.com/yourorg/mirador-nrt-aggregator/internal/model"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/config"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/model"
 
 	colllog "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	collmet "go.opentelemetry.io/proto/otlp/collector/metrics/v1"

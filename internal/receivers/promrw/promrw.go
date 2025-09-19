@@ -17,8 +17,8 @@ import (
 
 	"github.com/golang/snappy"
 
-	"github.com/yourorg/mirador-nrt-aggregator/internal/config"
-	"github.com/yourorg/mirador-nrt-aggregator/internal/model"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/config"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/model"
 )
 
 // Receiver implements a Prometheus Remote Write-compatible HTTP endpoint.

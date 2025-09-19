@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yourorg/mirador-nrt-aggregator/internal/config"
-	"github.com/yourorg/mirador-nrt-aggregator/internal/model"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/config"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/model"
 )
 
 // ---------------------------- Public processor ----------------------------

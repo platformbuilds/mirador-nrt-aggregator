@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yourorg/mirador-nrt-aggregator/internal/config"
-	"github.com/yourorg/mirador-nrt-aggregator/internal/model"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/config"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/model"
 )
 
 // processor aggregates JSON logs into per-service, fixed-size windows.

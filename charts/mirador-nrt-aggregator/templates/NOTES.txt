@@ -1,0 +1,15 @@
+Thank you for installing {{ .Chart.Name }}!
+
+Endpoints (ClusterIP {{ include "mirador.fullname" . }}):
+- OTLP gRPC:     {{ .Values.service.ports."otlp-grpc" }}
+- OTLP HTTP:     {{ .Values.service.ports."otlp-http" }}
+- Prom RemoteWrite: {{ .Values.service.ports.promrw }}
+- JSON Logs:     {{ .Values.service.ports.jsonlogs }}
+- Metrics:       {{ .Values.service.ports.metrics }}  (Prometheus /metrics)
+- Health:        {{ .Values.service.ports.health }}    (/healthz)
+
+Config:
+- Mounted at /etc/mirador/config.yaml from ConfigMap {{ include "mirador.fullname" . }}-config
+
+Weaviate API Key:
+- From Secret {{ .Values.weaviate.apiKeySecret.name }} key {{ .Values.weaviate.apiKeySecret.key }}

@@ -12,8 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/yourorg/mirador-nrt-aggregator/internal/config"
-	"github.com/yourorg/mirador-nrt-aggregator/internal/pipeline"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/config"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/pipeline"
 
 	"golang.org/x/sync/errgroup"
 

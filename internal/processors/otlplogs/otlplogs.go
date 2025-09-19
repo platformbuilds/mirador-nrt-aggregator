@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yourorg/mirador-nrt-aggregator/internal/config"
-	"github.com/yourorg/mirador-nrt-aggregator/internal/model"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/config"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/model"
 
 	colllog "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	com "go.opentelemetry.io/proto/otlp/common/v1"

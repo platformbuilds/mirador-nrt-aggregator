@@ -6,25 +6,25 @@ import (
 	"log"
 	"sync"
 
-	"github.com/yourorg/mirador-nrt-aggregator/internal/config"
-	"github.com/yourorg/mirador-nrt-aggregator/internal/exporters/weaviate"
-	"github.com/yourorg/mirador-nrt-aggregator/internal/model"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/config"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/exporters/weaviate"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/model"
 
 	// Receivers
-	jl "github.com/yourorg/mirador-nrt-aggregator/internal/receivers/jsonlogs"
-	"github.com/yourorg/mirador-nrt-aggregator/internal/receivers/kafka"
-	"github.com/yourorg/mirador-nrt-aggregator/internal/receivers/otlpgrpc"
-	"github.com/yourorg/mirador-nrt-aggregator/internal/receivers/otlphttp"
-	"github.com/yourorg/mirador-nrt-aggregator/internal/receivers/promrw"
-	"github.com/yourorg/mirador-nrt-aggregator/internal/receivers/pulsar"
+	jl "github.com/platformbuilds/mirador-nrt-aggregator/internal/receivers/jsonlogs"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/receivers/kafka"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/receivers/otlpgrpc"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/receivers/otlphttp"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/receivers/promrw"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/receivers/pulsar"
 
 	// Processors
-	"github.com/yourorg/mirador-nrt-aggregator/internal/processors/filter"
-	"github.com/yourorg/mirador-nrt-aggregator/internal/processors/iforest"
-	"github.com/yourorg/mirador-nrt-aggregator/internal/processors/logsum"
-	"github.com/yourorg/mirador-nrt-aggregator/internal/processors/spanmetrics"
-	"github.com/yourorg/mirador-nrt-aggregator/internal/processors/summarizer"
-	"github.com/yourorg/mirador-nrt-aggregator/internal/processors/vectorizer"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/processors/filter"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/processors/iforest"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/processors/logsum"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/processors/spanmetrics"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/processors/summarizer"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/processors/vectorizer"
 )
 
 // Interface contracts

@@ -11,8 +11,8 @@ import (
 
 	ps "github.com/apache/pulsar-client-go/pulsar"
 
-	"github.com/yourorg/mirador-nrt-aggregator/internal/config"
-	"github.com/yourorg/mirador-nrt-aggregator/internal/model"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/config"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/model"
 )
 
 // Receiver consumes messages from Apache Pulsar and forwards them as model.Envelope.

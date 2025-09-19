@@ -6,7 +6,7 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 # --- Project metadata ---
-MODULE        ?= github.com/yourorg/mirador-nrt-aggregator
+MODULE        ?= github.com/platformbuilds/mirador-nrt-aggregator
 MAIN_PKG      ?= ./cmd/mirador-nrt-aggregator
 BIN_DIR       ?= bin
 BIN_NAME      ?= mirador-core

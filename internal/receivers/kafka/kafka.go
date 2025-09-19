@@ -11,8 +11,8 @@ import (
 
 	kafkago "github.com/segmentio/kafka-go"
 
-	"github.com/yourorg/mirador-nrt-aggregator/internal/config"
-	"github.com/yourorg/mirador-nrt-aggregator/internal/model"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/config"
+	"github.com/platformbuilds/mirador-nrt-aggregator/internal/model"
 )
 
 // Receiver consumes binary payloads from Kafka and forwards them as model.Envelope.
