@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/platformbuilds/mirador-nrt-aggregator/internal/config"
+	stdoutexp "github.com/platformbuilds/mirador-nrt-aggregator/internal/exporters/stdout"
 	"github.com/platformbuilds/mirador-nrt-aggregator/internal/exporters/weaviate"
 	"github.com/platformbuilds/mirador-nrt-aggregator/internal/model"
 
@@ -285,6 +286,8 @@ func buildExporters(cfg *config.Config) (map[string]Exporter, error) {
 		switch ec.Type {
 		case "weaviate":
 			e = weaviate.New(ec)
+		case "stdout", "debug", "logging":
+			e = stdoutexp.New(ec)
 		default:
 			return nil, fmt.Errorf("unknown exporter type %q (key=%s)", ec.Type, key)
 		}

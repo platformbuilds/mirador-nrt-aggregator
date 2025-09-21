@@ -3,8 +3,8 @@ package weaviate
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
-	"net/http/httptest"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -12,6 +12,12 @@ import (
 	"github.com/platformbuilds/mirador-nrt-aggregator/internal/config"
 	"github.com/platformbuilds/mirador-nrt-aggregator/internal/model"
 )
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) {
+	return f(r)
+}
 
 func TestNewAppliesDefaults(t *testing.T) {
 	exp := New(config.ExporterCfg{Endpoint: "http://example.com/", Class: "MyClass"})
@@ -28,8 +34,8 @@ func TestNewAppliesDefaults(t *testing.T) {
 }
 
 func TestUpsertSuccess(t *testing.T) {
-	var received atomic.Bool
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	var recorded atomic.Value
+	transport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		if r.Method != http.MethodPost {
 			t.Fatalf("expected POST, got %s", r.Method)
 		}
@@ -40,31 +46,29 @@ func TestUpsertSuccess(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			t.Fatalf("expected valid payload: %v", err)
 		}
-		received.Store(true)
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srv.Close()
+		recorded.Store(payload)
+		return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody, Header: make(http.Header)}, nil
+	})
 
-	exp := New(config.ExporterCfg{Endpoint: srv.URL, Class: "C", IDTemplate: "{{.Service}}-{{.Count}}"})
-	exp.client = srv.Client()
+	exp := New(config.ExporterCfg{Endpoint: "http://example.com", Class: "C", IDTemplate: "{{.Service}}-{{.Count}}"})
+	exp.client = &http.Client{Transport: transport}
 
 	agg := model.Aggregate{Service: "svc", Count: 7}
 	if err := exp.upsert(context.Background(), agg); err != nil {
 		t.Fatalf("upsert returned error: %v", err)
 	}
-	if !received.Load() {
-		t.Fatal("server did not receive request")
+	if recorded.Load() == nil {
+		t.Fatal("request payload not captured")
 	}
 }
 
 func TestUpsertHandles409(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusConflict)
-	}))
-	defer srv.Close()
+	transport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusConflict, Body: http.NoBody, Header: make(http.Header)}, nil
+	})
 
-	exp := New(config.ExporterCfg{Endpoint: srv.URL, Class: "C"})
-	exp.client = srv.Client()
+	exp := New(config.ExporterCfg{Endpoint: "http://example.com", Class: "C"})
+	exp.client = &http.Client{Transport: transport}
 
 	if err := exp.upsert(context.Background(), model.Aggregate{}); err != nil {
 		t.Fatalf("expected nil error on conflict, got %v", err)
@@ -72,27 +76,38 @@ func TestUpsertHandles409(t *testing.T) {
 }
 
 func TestUpsertPropagatesHTTPError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer srv.Close()
+	transport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusInternalServerError, Body: http.NoBody, Header: make(http.Header)}, nil
+	})
 
-	exp := New(config.ExporterCfg{Endpoint: srv.URL, Class: "C"})
-	exp.client = srv.Client()
+	exp := New(config.ExporterCfg{Endpoint: "http://example.com", Class: "C"})
+	exp.client = &http.Client{Transport: transport}
 
 	if err := exp.upsert(context.Background(), model.Aggregate{}); err == nil {
 		t.Fatal("expected error for 500 response")
 	}
 }
 
-func TestStartStopsOnContextCancel(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srv.Close()
+func TestUpsertPropagatesTransportErrors(t *testing.T) {
+	transport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return nil, errors.New("boom")
+	})
 
-	exp := New(config.ExporterCfg{Endpoint: srv.URL, Class: "C"})
-	exp.client = srv.Client()
+	exp := New(config.ExporterCfg{Endpoint: "http://example.com", Class: "C"})
+	exp.client = &http.Client{Transport: transport}
+
+	if err := exp.upsert(context.Background(), model.Aggregate{}); err == nil {
+		t.Fatal("expected transport error to propagate")
+	}
+}
+
+func TestStartStopsOnContextCancel(t *testing.T) {
+	transport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody, Header: make(http.Header)}, nil
+	})
+
+	exp := New(config.ExporterCfg{Endpoint: "http://example.com", Class: "C"})
+	exp.client = &http.Client{Transport: transport}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

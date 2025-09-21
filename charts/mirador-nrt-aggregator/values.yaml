@@ -2,8 +2,8 @@
 mode: Deployment
 
 image:
-  repository: yourorg/mirador-nrt-aggregator
-  tag: "0.1.0"
+  repository: platformbuilds/mirador-nrt-aggregator
+  tag: "1.0.0"
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
@@ -66,15 +66,8 @@ ingress:
   hosts: []
   tls: []
 
-# Config gets rendered into a ConfigMap; you can paste your full pipeline here.
-# Default is a safe, functional config matching our earlier example.
-config: |
-  {{- /* You may replace this block with your own config */ -}}
-  {{- nindent 2 .Values.defaultConfig | trim | nindent 0 -}}
-
-# Reference default config (separate to keep values.yaml tidy)
-defaultConfig: |
-  {{- /* full config.example.yaml from earlier answer, trimmed for space */ -}}
+# Config gets rendered into a ConfigMap as config.yaml. Override any section to customise the deployment.
+config:
   receivers:
     otlpgrpc:
       endpoint: ":4317"
@@ -97,7 +90,7 @@ defaultConfig: |
     summarizer:
       window_seconds: 60
     iforest:
-      features: ["p99","error_rate","rps"]
+      features: ["p99", "error_rate", "rps"]
       threshold: 0.7
     vectorizer:
       mode: "hash"
@@ -107,21 +100,24 @@ defaultConfig: |
       endpoint: "http://weaviate:8080"
       class: "MiradorAggregate"
       api_key: "${WEAVIATE_API_KEY}"
+    stdout:
+      pretty: true
+      include_vector: false
 
   service:
     pipelines:
       traces:
         receivers: [otlpgrpc, otlphttp]
         processors: [spanmetrics, summarizer, iforest, vectorizer]
-        exporters: [weaviate]
+        exporters: [weaviate, stdout]
       metrics:
         receivers: [otlpgrpc, otlphttp, promrw]
         processors: [summarizer, iforest, vectorizer]
-        exporters: [weaviate]
+        exporters: [weaviate, stdout]
       logs:
         receivers: [otlpgrpc, otlphttp, jsonlogs/http]
         processors: [otlplogs, logsum, iforest, vectorizer]
-        exporters: [weaviate]
+        exporters: [weaviate, stdout]
 
   prometheus:
     endpoint: "0.0.0.0:8888"

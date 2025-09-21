@@ -13,10 +13,10 @@ spec:
     app.kubernetes.io/instance: {{ .Release.Name }}
   ports:
     - name: otlp-grpc
-      port: {{ .Values.service.ports."otlp-grpc" }}
+      port: {{ index .Values.service.ports "otlp-grpc" }}
       targetPort: 4317
     - name: otlp-http
-      port: {{ .Values.service.ports."otlp-http" }}
+      port: {{ index .Values.service.ports "otlp-http" }}
       targetPort: 4318
     - name: promrw
       port: {{ .Values.service.ports.promrw }}

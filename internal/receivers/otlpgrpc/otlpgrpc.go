@@ -36,6 +36,8 @@ type Receiver struct {
 	maxConcurrent    uint32
 	enableReflection bool
 
+	listen func(network, addr string) (net.Listener, error)
+
 	// TLS
 	tlsEnabled        bool
 	tlsCertFile       string
@@ -149,6 +151,7 @@ func New(rc config.ReceiverCfg) *Receiver {
 		requireClientCert: requireClientCert,
 		kap:               kap,
 		kep:               kep,
+		listen:            net.Listen,
 	}
 }
 
@@ -158,7 +161,7 @@ func (r *Receiver) Start(ctx context.Context, out chan<- model.Envelope) error {
 		addr = ":4317"
 	}
 
-	lis, err := net.Listen("tcp", addr)
+	lis, err := r.listen("tcp", addr)
 	if err != nil {
 		return err
 	}

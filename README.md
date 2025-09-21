@@ -90,7 +90,7 @@ helm upgrade --install mirador mirador/mirador-nrt-aggregator \
 
 - **Receivers**: Ingest OTLP, PromRW, JSON logs (HTTP/Kafka/Pulsar)  
 - **Processors**: Filtering, summarization, anomaly scoring, vectorization  
-- **Exporters**: Store enriched, vectorized objects in Weaviate  
+- **Exporters**: Store enriched, vectorized objects in Weaviate and optionally mirror to stdout for debugging  
 
 ---
 
@@ -103,7 +103,7 @@ service:
     traces:
       receivers: [otlpgrpc, otlphttp, kafka/traces, pulsar/traces]
       processors: [spanmetrics, summarizer, iforest, vectorizer]
-      exporters: [weaviate]
+      exporters: [weaviate, stdout]
 ```
 
 ### Metrics
@@ -111,7 +111,7 @@ service:
     metrics:
       receivers: [otlpgrpc, otlphttp, promrw, kafka/metrics, kafka/promrw]
       processors: [summarizer, iforest, vectorizer]
-      exporters: [weaviate]
+      exporters: [weaviate, stdout]
 ```
 
 ### Logs
@@ -119,7 +119,7 @@ service:
     logs:
       receivers: [otlpgrpc, otlphttp, jsonlogs/http, kafka/jsonlogs, pulsar/jsonlogs]
       processors: [otlplogs, logsum, iforest, vectorizer]
-      exporters: [weaviate]
+      exporters: [weaviate, stdout]
 ```
 
 ---
@@ -130,7 +130,7 @@ service:
 - Internal packages:
   - `internal/receivers`: otlpgrpc, otlphttp, promrw, kafka, pulsar, jsonlogs
   - `internal/processors`: filter, spanmetrics, otlplogs, logsum, summarizer, iforest, vectorizer
-  - `internal/exporters`: weaviate
+  - `internal/exporters`: weaviate, stdout
   - `internal/model`: Envelope definitions
   - `internal/pipeline`: pipeline wiring
 

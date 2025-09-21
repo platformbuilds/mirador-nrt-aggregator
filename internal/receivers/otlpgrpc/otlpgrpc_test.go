@@ -2,6 +2,7 @@ package otlpgrpc
 
 import (
 	"context"
+	"errors"
 	"net"
 	"strings"
 	"testing"
@@ -63,6 +64,9 @@ func TestReceiverStartTLSConfigError(t *testing.T) {
 	r := New(config.ReceiverCfg{Endpoint: "127.0.0.1:0", Extra: map[string]any{
 		"tls": map[string]any{"enabled": true},
 	}})
+	r.listen = func(network, addr string) (net.Listener, error) {
+		return nopListener{}, nil
+	}
 	err := r.Start(context.Background(), make(chan model.Envelope))
 	if err == nil || !strings.Contains(err.Error(), "cert_file") {
 		t.Fatalf("expected tls config error, got %v", err)
@@ -70,19 +74,20 @@ func TestReceiverStartTLSConfigError(t *testing.T) {
 }
 
 func TestReceiverStartFailsWhenPortInUse(t *testing.T) {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen: %v", err)
+	r := New(config.ReceiverCfg{Endpoint: "127.0.0.1:4317"})
+	r.listen = func(network, addr string) (net.Listener, error) {
+		return nil, errors.New("in use")
 	}
-	addr := ln.Addr().String()
-	defer ln.Close()
-
-	r := New(config.ReceiverCfg{Endpoint: addr})
-	err = r.Start(context.Background(), make(chan model.Envelope))
-	if err == nil {
+	if err := r.Start(context.Background(), make(chan model.Envelope)); err == nil {
 		t.Fatal("expected error when port already in use")
 	}
 }
+
+type nopListener struct{}
+
+func (nopListener) Accept() (net.Conn, error) { return nil, errors.New("not implemented") }
+func (nopListener) Close() error              { return nil }
+func (nopListener) Addr() net.Addr            { return &net.TCPAddr{} }
 
 func TestMetricsExportBackpressureRespectsContext(t *testing.T) {
 	ch := make(chan model.Envelope)

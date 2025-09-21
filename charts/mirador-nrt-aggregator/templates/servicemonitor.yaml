@@ -4,8 +4,10 @@ kind: ServiceMonitor
 metadata:
   name: {{ include "mirador.fullname" . }}
   labels:
-    {{- include "mirador.labels" . | nindent 4 }}
-    {{- toYaml .Values.serviceMonitor.labels | nindent 4 }}
+{{ include "mirador.labels" . | indent 4 }}
+{{ with .Values.serviceMonitor.labels }}
+{{ toYaml . | indent 4 }}
+{{ end }}
 spec:
   selector:
     matchLabels:

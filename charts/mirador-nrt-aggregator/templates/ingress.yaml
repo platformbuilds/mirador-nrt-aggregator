@@ -19,19 +19,19 @@ spec:
           backend:
             service:
               name: {{ include "mirador.fullname" $ }}
-              port: { number: {{ $.Values.service.ports."otlp-http" }} }
+              port: { number: {{ index $.Values.service.ports "otlp-http" }} }
         - path: /v1/metrics
           pathType: Prefix
           backend:
             service:
               name: {{ include "mirador.fullname" $ }}
-              port: { number: {{ $.Values.service.ports."otlp-http" }} }
+              port: { number: {{ index $.Values.service.ports "otlp-http" }} }
         - path: /v1/logs
           pathType: Prefix
           backend:
             service:
               name: {{ include "mirador.fullname" $ }}
-              port: { number: {{ $.Values.service.ports."otlp-http" }} }
+              port: { number: {{ index $.Values.service.ports "otlp-http" }} }
   {{- end }}
   {{- if .Values.ingress.tls }}
   tls:

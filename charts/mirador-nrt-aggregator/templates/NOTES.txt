@@ -1,8 +1,8 @@
 Thank you for installing {{ .Chart.Name }}!
 
 Endpoints (ClusterIP {{ include "mirador.fullname" . }}):
-- OTLP gRPC:     {{ .Values.service.ports."otlp-grpc" }}
-- OTLP HTTP:     {{ .Values.service.ports."otlp-http" }}
+- OTLP gRPC:     {{ index .Values.service.ports "otlp-grpc" }}
+- OTLP HTTP:     {{ index .Values.service.ports "otlp-http" }}
 - Prom RemoteWrite: {{ .Values.service.ports.promrw }}
 - JSON Logs:     {{ .Values.service.ports.jsonlogs }}
 - Metrics:       {{ .Values.service.ports.metrics }}  (Prometheus /metrics)

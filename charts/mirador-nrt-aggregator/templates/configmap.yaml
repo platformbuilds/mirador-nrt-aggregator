@@ -6,4 +6,6 @@ metadata:
     {{- include "mirador.labels" . | nindent 4 }}
 data:
   config.yaml: |
-{{ .Values.config | indent 4 }}
+{{- with .Values.config }}
+{{ toYaml . | indent 4 }}
+{{- end }}

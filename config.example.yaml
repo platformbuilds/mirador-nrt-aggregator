@@ -206,6 +206,9 @@ exporters:
     endpoint: "http://weaviate:8080"
     class: "MiradorAggregate"
     api_key: "${WEAVIATE_API_KEY}"
+  stdout:
+    pretty: true
+    include_vector: false
 
 # ------------------------------- Service --------------------------------
 service:
@@ -214,19 +217,19 @@ service:
     traces:
       receivers: [otlpgrpc, otlphttp, kafka/traces, pulsar/traces]
       processors: [spanmetrics, filter/metrics-pre, summarizer, filter/agg-post, iforest, vectorizer]
-      exporters: [weaviate]
+      exporters: [weaviate, stdout]
 
     # Metrics (OTLP + PromRW) → summarizer → iforest → vectorizer → Weaviate
     metrics:
       receivers: [otlpgrpc, otlphttp, promrw, kafka/metrics, kafka/promrw]
       processors: [filter/metrics-pre, summarizer, filter/agg-post, iforest, vectorizer]
-      exporters: [weaviate]
+      exporters: [weaviate, stdout]
 
     # Logs (OTLP logs + JSON logs) → flatten → logsum → iforest → vectorizer → Weaviate
     logs:
       receivers: [otlpgrpc, otlphttp, jsonlogs/http, kafka/jsonlogs, pulsar/jsonlogs]
       processors: [otlplogs, logsum, filter/agg-post, iforest, vectorizer]
-      exporters: [weaviate]
+      exporters: [weaviate, stdout]
 
 # ----------------------------- Extensions --------------------------------
 extensions:

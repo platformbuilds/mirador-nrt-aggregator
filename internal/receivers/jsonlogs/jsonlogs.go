@@ -45,7 +45,43 @@ func (r *HTTPReceiver) Start(ctx context.Context, out chan<- model.Envelope) err
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc(r.path, func(w http.ResponseWriter, req *http.Request) {
+	mux.Handle(r.path, r.handler(out))
+
+	srv := &http.Server{
+		Addr:              r.addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	// listener to detect address in logs
+	ln, err := net.Listen("tcp", r.addr)
+	if err != nil {
+		return err
+	}
+	log.Printf("[jsonlogs/http] listening on %s path=%s", r.addr, r.path)
+
+	// Serve in background
+	errCh := make(chan error, 1)
+	go func() {
+		if serveErr := srv.Serve(ln); serveErr != nil && serveErr != http.ErrServerClosed {
+			errCh <- serveErr
+		}
+	}()
+
+	// Shutdown when ctx is done
+	select {
+	case <-ctx.Done():
+		shctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(shctx)
+		return nil
+	case e := <-errCh:
+		return e
+	}
+}
+
+func (r *HTTPReceiver) handler(out chan<- model.Envelope) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if req.Method != http.MethodPost {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
@@ -142,38 +178,6 @@ func (r *HTTPReceiver) Start(ctx context.Context, out chan<- model.Envelope) err
 			_, _ = w.Write([]byte("ok"))
 		}
 	})
-
-	srv := &http.Server{
-		Addr:              r.addr,
-		Handler:           mux,
-		ReadHeaderTimeout: 5 * time.Second,
-	}
-
-	// listener to detect address in logs
-	ln, err := net.Listen("tcp", r.addr)
-	if err != nil {
-		return err
-	}
-	log.Printf("[jsonlogs/http] listening on %s path=%s", r.addr, r.path)
-
-	// Serve in background
-	errCh := make(chan error, 1)
-	go func() {
-		if serveErr := srv.Serve(ln); serveErr != nil && serveErr != http.ErrServerClosed {
-			errCh <- serveErr
-		}
-	}()
-
-	// Shutdown when ctx is done
-	select {
-	case <-ctx.Done():
-		shctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		_ = srv.Shutdown(shctx)
-		return nil
-	case e := <-errCh:
-		return e
-	}
 }
 
 // ----------------------------- Kafka receiver -----------------------------

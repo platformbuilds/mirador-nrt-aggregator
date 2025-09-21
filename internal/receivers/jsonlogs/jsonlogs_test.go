@@ -1,9 +1,12 @@
 package jsonlogs
 
 import (
+	"bufio"
+	"bytes"
+	"compress/gzip"
 	"context"
-	"net"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -70,34 +73,18 @@ func TestHTTPReceiverStartInvalidAddress(t *testing.T) {
 }
 
 func TestHTTPReceiverMalformedGzipReturns400(t *testing.T) {
-	addr := freePort(t)
-	rec := NewHTTP(config.ReceiverCfg{Endpoint: addr})
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	rec := NewHTTP(config.ReceiverCfg{})
 	out := make(chan model.Envelope, 1)
-	done := make(chan error, 1)
-	go func() { done <- rec.Start(ctx, out) }()
-	defer func() {
-		cancel()
-		if err := <-done; err != nil {
-			t.Fatalf("start returned error: %v", err)
-		}
-	}()
+	handler := rec.handler(out)
 
-	waitForListener(t, addr)
-
-	req, err := http.NewRequest(http.MethodPost, "http://"+addr+defaultPath, strings.NewReader("not gzip"))
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
+	req := httptest.NewRequest(http.MethodPost, "http://example.com"+defaultPath, strings.NewReader("not gzip"))
 	req.Header.Set("Content-Encoding", "gzip")
+	rr := httptest.NewRecorder()
 
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("http post: %v", err)
-	}
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Fatalf("expected 400 for bad gzip, got %d", resp.StatusCode)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for bad gzip, got %d", rr.Code)
 	}
 
 	select {
@@ -108,46 +95,24 @@ func TestHTTPReceiverMalformedGzipReturns400(t *testing.T) {
 }
 
 func TestHTTPReceiverBackpressureBlocksUntilDrained(t *testing.T) {
-	addr := freePort(t)
-	rec := NewHTTP(config.ReceiverCfg{Endpoint: addr})
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	rec := NewHTTP(config.ReceiverCfg{})
 	out := make(chan model.Envelope)
-	done := make(chan error, 1)
-	go func() { done <- rec.Start(ctx, out) }()
-	defer func() {
-		cancel()
-		if err := <-done; err != nil {
-			t.Fatalf("start returned error: %v", err)
-		}
-	}()
-
-	waitForListener(t, addr)
+	handler := rec.handler(out)
 
 	body := "{\"msg\":1}\n{\"msg\":2}\n"
+	req := httptest.NewRequest(http.MethodPost, "http://example.com"+defaultPath, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/x-ndjson")
 
-	respCh := make(chan *http.Response, 1)
-	errCh := make(chan error, 1)
+	rr := httptest.NewRecorder()
+	done := make(chan struct{})
 	go func() {
-		req, err := http.NewRequest(http.MethodPost, "http://"+addr+defaultPath, strings.NewReader(body))
-		if err != nil {
-			errCh <- err
-			return
-		}
-		req.Header.Set("Content-Type", "application/x-ndjson")
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			errCh <- err
-			return
-		}
-		respCh <- resp
+		handler.ServeHTTP(rr, req)
+		close(done)
 	}()
 
 	select {
-	case <-respCh:
-		t.Fatal("request should block until envelopes drained")
-	case err := <-errCh:
-		t.Fatalf("http post failed early: %v", err)
+	case <-done:
+		t.Fatal("handler should block until envelopes drained")
 	case <-time.After(100 * time.Millisecond):
 	}
 
@@ -158,36 +123,65 @@ func TestHTTPReceiverBackpressureBlocksUntilDrained(t *testing.T) {
 	}
 
 	select {
-	case resp := <-respCh:
-		if resp.StatusCode != http.StatusAccepted {
-			t.Fatalf("expected 202, got %d", resp.StatusCode)
-		}
-	case err := <-errCh:
-		t.Fatalf("http post failed: %v", err)
+	case <-done:
 	case <-time.After(500 * time.Millisecond):
-		t.Fatal("request did not complete after draining")
+		t.Fatal("handler did not finish after draining")
+	}
+
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d", rr.Code)
 	}
 }
 
-func freePort(t *testing.T) string {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("failed to listen for free port: %v", err)
+func TestHandlerParsesGzip(t *testing.T) {
+	rec := NewHTTP(config.ReceiverCfg{})
+	out := make(chan model.Envelope, 1)
+	handler := rec.handler(out)
+
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	_, _ = gz.Write([]byte("{\"msg\":1}"))
+	_ = gz.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "http://example.com"+defaultPath, bytes.NewReader(buf.Bytes()))
+	req.Header.Set("Content-Encoding", "gzip")
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d", rr.Code)
 	}
-	addr := ln.Addr().String()
-	_ = ln.Close()
-	return addr
+	select {
+	case <-out:
+	case <-time.After(time.Second):
+		t.Fatal("expected envelope from gzip payload")
+	}
 }
 
-func waitForListener(t *testing.T, addr string) {
-	t.Helper()
-	for i := 0; i < 50; i++ {
-		conn, err := net.DialTimeout("tcp", addr, 50*time.Millisecond)
-		if err == nil {
-			_ = conn.Close()
-			return
-		}
-		time.Sleep(20 * time.Millisecond)
+func TestHandlerSplitsNDJSONWithBufferGrowth(t *testing.T) {
+	rec := NewHTTP(config.ReceiverCfg{})
+	out := make(chan model.Envelope, 2)
+	handler := rec.handler(out)
+
+	var long bytes.Buffer
+	writer := bufio.NewWriter(&long)
+	_, _ = writer.WriteString(strings.Repeat("a", 70*1024) + "\n")
+	_, _ = writer.WriteString("{\"msg\":2}\n")
+	writer.Flush()
+
+	req := httptest.NewRequest(http.MethodPost, "http://example.com"+defaultPath, bytes.NewReader(long.Bytes()))
+	req.Header.Set("Content-Type", "application/x-ndjson")
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d", rr.Code)
 	}
-	t.Fatalf("timeout waiting for listener on %s", addr)
+
+	if len(out) != 2 {
+		t.Fatalf("expected 2 envelopes, got %d", len(out))
+	}
 }
