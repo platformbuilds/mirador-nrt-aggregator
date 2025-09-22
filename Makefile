@@ -21,7 +21,7 @@ BUILD_DATE    := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 BRANCH        := $(shell $(GIT) rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
 # If VERSION env is set, prefer it; else use GIT_TAG (strip leading v for -X)
 VERSION       ?= $(GIT_TAG)
-VERSION_PLAIN := $(shell echo "$(VERSION)" | sed 's/^v//')
+VERSION_PLAIN := $(shell echo "$(VERSION)")
 
 # Try to populate common ldflags (safe even if vars don’t exist in main)
 LDFLAGS+= -X main.version=$(VERSION_PLAIN)
