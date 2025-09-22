@@ -45,10 +45,11 @@ ifeq ($(HOST_ARCH),aarch64)
 endif
 
 # Docker image
-IMAGE_REPO ?= yourorg
-IMAGE_NAME ?= mirador-nrt-aggregator
-IMAGE_TAG  ?= $(VERSION_PLAIN)
-IMAGE      ?= $(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_TAG)
+IMAGE_REPO   ?= platformbuilds
+IMAGE_NAME   ?= mirador-nrt-aggregator
+IMAGE_TAG    ?= $(VERSION_PLAIN)
+IMAGE        ?= $(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_TAG)
+IMAGE_LATEST ?= $(IMAGE_REPO)/$(IMAGE_NAME):latest
 
 # Buildx platforms
 PLATFORMS  ?= linux/amd64,linux/arm64
@@ -202,10 +203,10 @@ check-tools: ## Verify required tools installed
 docker: docker-build ## Alias
 
 docker-build: ## Build single-arch image for host arch
-	docker build -t $(IMAGE) .
+	docker build -t $(IMAGE) -t $(IMAGE_LATEST) .
 
 docker-build-native: buildx-ensure ## Build native-arch with buildx and load
-	docker buildx build --load -t $(IMAGE) --platform $(HOST_OS)/$(HOST_ARCH) .
+	docker buildx build --load -t $(IMAGE) -t $(IMAGE_LATEST) --platform $(HOST_OS)/$(HOST_ARCH) .
 
 buildx-ensure: ## Ensure buildx builder exists/active
 	@if ! docker buildx inspect mirador-builder >/dev/null 2>&1; then \
@@ -220,6 +221,7 @@ dockerx-build: buildx-ensure ## Multi-arch build (no push)
 	docker buildx build \
 	  --platform $(PLATFORMS) \
 	  -t $(IMAGE) \
+	  -t $(IMAGE_LATEST) \
 	  .
 
 dockerx-build-local-multi: buildx-ensure ## Build and load per-arch locally
@@ -230,6 +232,7 @@ dockerx-push: buildx-ensure ## Multi-arch build and push
 	docker buildx build \
 	  --platform $(PLATFORMS) \
 	  -t $(IMAGE) \
+	  -t $(IMAGE_LATEST) \
 	  --push \
 	  .
 
